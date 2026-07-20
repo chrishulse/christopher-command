@@ -9,45 +9,39 @@ type OperationsBriefingProps = {
   onClose: () => void;
 };
 
-const timeline = [
-  { time: "7:45 AM", action: "Depart for the property" },
-  { time: "8:20 AM", action: "Arrive and complete site assessment" },
-  { time: "8:30 AM", action: "Aircraft inspection and pre-flight setup" },
-  { time: "8:45 AM", action: "Capture essential aerial photographs" },
-  { time: "9:30 AM", action: "Record smooth property orbit" },
-  { time: "10:00 AM", action: "Verify coverage and back up media" },
-  { time: "1:00 PM", action: "Edit and prepare preview assets" },
-  { time: "4:30 PM", action: "Deliver client preview package" },
-];
+type TimelineItem = {
+  time: string;
+  action: string;
+};
 
-const equipment = [
-  "DJI Mini 4 Pro",
-  "RC 2 controller",
-  "Three charged flight batteries",
-  "ND filter set",
-  "Formatted memory cards",
-  "Landing pad",
-  "Phone and charging cable",
-  "Backup storage drive",
-];
+type RiskItem = {
+  title: string;
+  detail: string;
+};
 
-const risks = [
-  {
-    title: "Wind conditions",
-    detail:
-      "Complete exterior flight operations early before afternoon winds increase.",
-  },
-  {
-    title: "Airspace verification",
-    detail:
-      "Confirm operating restrictions and authorization requirements before departure.",
-  },
-  {
-    title: "Battery reserve",
-    detail:
-      "Land each flight with sufficient reserve capacity and keep one battery unused for contingency coverage.",
-  },
-];
+type BriefingData = {
+  objective: string;
+  timeline: TimelineItem[];
+  equipment: string[];
+  risks: RiskItem[];
+  revenueOpportunity: {
+    amount: string;
+    rationale: string;
+  };
+  firstAction: {
+    action: string;
+    reason: string;
+  };
+};
+
+type BriefingResponse = {
+  briefing: BriefingData;
+  mode: "live";
+  model: string;
+  requestId?: string;
+};
+
+type GenerationMode = "idle" | "live" | "fallback";
 
 export default function OperationsBriefing({
   open,
@@ -56,15 +50,23 @@ export default function OperationsBriefing({
 }: OperationsBriefingProps) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [briefingReady, setBriefingReady] = useState(false);
+  const [briefing, setBriefing] = useState<BriefingData | null>(null);
+  const [generationMode, setGenerationMode] =
+    useState<GenerationMode>("idle");
+  const [generationMessage, setGenerationMessage] =
+    useState<string | null>(null);
 
   const clientName = project?.clientName.trim() || "Demo Client";
   const projectType =
     project?.projectType.trim() || "Residential Real Estate";
   const location = project?.location.trim() || "Lubbock, Texas";
   const projectTitle =
-    project?.plan.projectTitle || "Demo Client — Residential Real Estate";
+    project?.plan.projectTitle ||
+    "Demo Client — Residential Real Estate";
   const recommendedPackage =
     project?.plan.recommendedPackage || "Essential Listing Package";
+  const projectNotes =
+    project?.notes.trim() || "No additional client notes.";
 
   const deadlineLabel = project?.deadline
     ? new Date(`${project.deadline}T12:00:00`).toLocaleDateString(
@@ -88,23 +90,138 @@ export default function OperationsBriefing({
             ? "$350"
             : "$250+";
 
+  const localFallback: BriefingData = {
+    objective:
+      `Complete the ${projectType.toLowerCase()} assignment for ` +
+      `${clientName} and prepare the agreed deliverables by ${deadlineLabel}.`,
+    timeline: [
+      {
+        time: "7:45 AM",
+        action: "Confirm the client scope, location, and deliverables.",
+      },
+      {
+        time: "8:00 AM",
+        action: "Check weather, airspace, access, and operating restrictions.",
+      },
+      {
+        time: "8:30 AM",
+        action: "Inspect equipment and complete the field setup.",
+      },
+      {
+        time: "8:45 AM",
+        action: "Capture the required photographs and video assets.",
+      },
+      {
+        time: "10:00 AM",
+        action: "Verify coverage and back up all original media.",
+      },
+      {
+        time: "1:00 PM",
+        action: "Edit, organize, and export the client deliverables.",
+      },
+      {
+        time: "4:30 PM",
+        action: "Send the preview or completed delivery package.",
+      },
+    ],
+    equipment: [
+      "Primary aircraft",
+      "Remote controller",
+      "Charged flight batteries",
+      "Formatted memory cards",
+      "ND filter set",
+      "Landing pad",
+      "Phone and charging cable",
+      "Backup storage drive",
+    ],
+    risks: [
+      {
+        title: "Weather conditions",
+        detail:
+          "Check current and forecast conditions before beginning field operations.",
+      },
+      {
+        title: "Airspace and authorization",
+        detail:
+          "Verify applicable airspace, restrictions, and authorization requirements.",
+      },
+      {
+        title: "Client scope",
+        detail:
+          "Confirm access, property boundaries, required deliverables, and delivery expectations.",
+      },
+    ],
+    revenueOpportunity: {
+      amount: estimatedInvoice,
+      rationale:
+        `Estimated value for the ${recommendedPackage.toLowerCase()}. ` +
+        "Final pricing should be confirmed against the approved scope.",
+    },
+    firstAction: {
+      action: `Confirm the assignment details with ${clientName}.`,
+      reason:
+        "The location, access, deliverables, and operating window should be verified before field preparation begins.",
+    },
+  };
+
   if (!open) {
     return null;
   }
 
-  function generateBriefing() {
+  async function generateBriefing() {
     setBriefingReady(false);
+    setBriefing(null);
+    setGenerationMode("idle");
+    setGenerationMessage(null);
     setIsGenerating(true);
 
-    window.setTimeout(() => {
+    try {
+      const response = await fetch("/api/briefing", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          clientName,
+          projectType,
+          location,
+          deadline: project?.deadline || "",
+          notes: projectNotes,
+          recommendedPackage,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Briefing request failed: ${response.status}`);
+      }
+
+      const result = (await response.json()) as BriefingResponse;
+
+      setBriefing(result.briefing);
+      setGenerationMode("live");
+      setGenerationMessage(
+        "This briefing was generated live by GPT-5.6.",
+      );
+    } catch (error) {
+      console.error("Live briefing generation failed.", error);
+
+      setBriefing(localFallback);
+      setGenerationMode("fallback");
+      setGenerationMessage(
+        "Live AI was unavailable, so CT continued with its local operations engine.",
+      );
+    } finally {
       setIsGenerating(false);
       setBriefingReady(true);
-    }, 1100);
+    }
   }
 
   function closeBriefing() {
     setIsGenerating(false);
     setBriefingReady(false);
+    setBriefing(null);
+    setGenerationMode("idle");
+    setGenerationMessage(null);
     onClose();
   }
 
@@ -128,7 +245,11 @@ export default function OperationsBriefing({
 
           <div className="flex flex-wrap items-center gap-3">
             <span className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-2 text-xs font-medium text-emerald-200">
-              Local Operations Engine
+              {generationMode === "live"
+                ? "Live · GPT-5.6"
+                : generationMode === "fallback"
+                  ? "Local fallback"
+                  : "GPT-5.6 · Fallback ready"}
             </span>
 
             <button
@@ -152,7 +273,7 @@ export default function OperationsBriefing({
             </h2>
 
             <p className="mt-4 max-w-3xl leading-7 text-slate-300">
-              CT will organize the assignment into a timeline,
+              GPT-5.6 will organize the assignment into a timeline,
               equipment plan, risk assessment, revenue opportunity,
               and recommended first action.
             </p>
@@ -179,20 +300,20 @@ export default function OperationsBriefing({
             <button
               type="button"
               onClick={generateBriefing}
-              className="mt-8 w-full rounded-xl bg-blue-500 px-6 py-4 text-lg font-semibold shadow-lg shadow-blue-500/20 transition hover:-translate-y-0.5 hover:bg-blue-400 sm:w-auto"
+              className="mt-8 w-full rounded-xl bg-emerald-500 px-6 py-4 text-lg font-semibold shadow-lg shadow-emerald-500/20 transition hover:-translate-y-0.5 hover:bg-emerald-400 sm:w-auto"
             >
-              Generate Operations Briefing
+              Generate Live Briefing
             </button>
           </section>
         )}
 
         {isGenerating && (
-          <section className="flex min-h-[32rem] items-center justify-center rounded-3xl border border-slate-800 bg-slate-900/70">
+          <section className="flex min-h-[32rem] items-center justify-center rounded-3xl border border-slate-800 bg-slate-900/70 px-6">
             <div className="text-center">
-              <div className="mx-auto h-12 w-12 animate-spin rounded-full border-4 border-slate-700 border-t-blue-400" />
+              <div className="mx-auto h-12 w-12 animate-spin rounded-full border-4 border-slate-700 border-t-emerald-400" />
 
               <h2 className="mt-6 text-2xl font-bold">
-                Organizing today&apos;s mission
+                GPT-5.6 is organizing the mission
               </h2>
 
               <p className="mt-3 text-slate-400">
@@ -202,8 +323,22 @@ export default function OperationsBriefing({
           </section>
         )}
 
-        {briefingReady && !isGenerating && (
+        {briefingReady && briefing && !isGenerating && (
           <div className="space-y-6">
+            {generationMessage && (
+              <section
+                className={`rounded-2xl border p-4 ${
+                  generationMode === "live"
+                    ? "border-emerald-400/20 bg-emerald-400/10 text-emerald-100"
+                    : "border-amber-400/20 bg-amber-400/10 text-amber-100"
+                }`}
+              >
+                <p className="text-sm font-medium">
+                  {generationMessage}
+                </p>
+              </section>
+            )}
+
             <section className="rounded-3xl border border-blue-400/20 bg-gradient-to-br from-blue-500/20 via-slate-900 to-slate-900 p-7">
               <div className="flex flex-col justify-between gap-6 md:flex-row md:items-end">
                 <div>
@@ -212,9 +347,7 @@ export default function OperationsBriefing({
                   </p>
 
                   <h2 className="mt-3 max-w-3xl text-3xl font-bold">
-                    Complete the {projectType.toLowerCase()} assignment
-                    for {clientName} and deliver polished assets by{" "}
-                    {deadlineLabel}.
+                    {briefing.objective}
                   </h2>
                 </div>
 
@@ -232,12 +365,12 @@ export default function OperationsBriefing({
                 </p>
 
                 <div className="mt-6 space-y-3">
-                  {timeline.map((item) => (
+                  {briefing.timeline.map((item) => (
                     <div
                       key={`${item.time}-${item.action}`}
                       className="flex gap-4 rounded-2xl border border-slate-800 bg-slate-950/60 p-4"
                     >
-                      <p className="w-20 shrink-0 text-sm font-semibold text-blue-300">
+                      <p className="w-28 shrink-0 text-sm font-semibold text-blue-300">
                         {item.time}
                       </p>
 
@@ -256,12 +389,11 @@ export default function OperationsBriefing({
                   </p>
 
                   <p className="mt-3 text-4xl font-bold">
-                    {estimatedInvoice}
+                    {briefing.revenueOpportunity.amount}
                   </p>
 
                   <p className="mt-2 text-sm leading-6 text-emerald-100/70">
-                    Estimated invoice for the{" "}
-                    {recommendedPackage.toLowerCase()}.
+                    {briefing.revenueOpportunity.rationale}
                   </p>
                 </section>
 
@@ -271,12 +403,11 @@ export default function OperationsBriefing({
                   </p>
 
                   <p className="mt-3 text-xl font-bold">
-                    Leave by 7:45 AM.
+                    {briefing.firstAction.action}
                   </p>
 
                   <p className="mt-2 text-sm leading-6 text-slate-300">
-                    This protects the best lighting window and reduces
-                    exposure to stronger afternoon winds.
+                    {briefing.firstAction.reason}
                   </p>
                 </section>
               </div>
@@ -290,7 +421,7 @@ export default function OperationsBriefing({
                 </p>
 
                 <div className="mt-6 grid gap-3 sm:grid-cols-2">
-                  {equipment.map((item) => (
+                  {briefing.equipment.map((item) => (
                     <div
                       key={item}
                       className="flex items-center gap-3 rounded-xl border border-slate-800 bg-slate-950/60 p-3"
@@ -299,7 +430,9 @@ export default function OperationsBriefing({
                         ✓
                       </span>
 
-                      <p className="text-sm text-slate-300">{item}</p>
+                      <p className="text-sm text-slate-300">
+                        {item}
+                      </p>
                     </div>
                   ))}
                 </div>
@@ -312,7 +445,7 @@ export default function OperationsBriefing({
                 </p>
 
                 <div className="mt-6 space-y-3">
-                  {risks.map((risk) => (
+                  {briefing.risks.map((risk) => (
                     <div
                       key={risk.title}
                       className="rounded-2xl border border-amber-400/15 bg-amber-400/5 p-4"
