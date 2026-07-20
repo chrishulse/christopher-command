@@ -30,7 +30,7 @@ const workflowSteps = [
 
 const priorities = [
   {
-    task: "Prepare Harper Property mission",
+    task: "Prepare Demo Client mission",
     status: "Ready",
     time: "8:30 AM",
   },
@@ -302,12 +302,12 @@ export default function Home() {
                 <div>
                   <h2 className="text-3xl font-bold">
                     {activeProject?.plan.projectTitle ??
-                      "Harper Property Aerial Package"}
+                      "Demo Client — Residential Real Estate"}
                   </h2>
 
                   <p className="mt-3 max-w-2xl leading-7 text-slate-300">
                     {activeProject?.plan.executiveSummary ??
-                      "Capture the essential listing images, complete one smooth property orbit, and prepare same-day preview assets."}
+                      "Prepare a sample residential real estate package, then create your own client project to personalize Mission Control."}
                   </p>
                 </div>
 

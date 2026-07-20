@@ -235,7 +235,7 @@ export default function ClientIntake({
                   onChange={(event) =>
                     updateField("clientName", event.target.value)
                   }
-                  placeholder="Harper Realty"
+                  placeholder="Demo Client"
                   className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-white outline-none transition placeholder:text-slate-600 focus:border-blue-400"
                 />
               </label>

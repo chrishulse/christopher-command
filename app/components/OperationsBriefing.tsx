@@ -57,12 +57,12 @@ export default function OperationsBriefing({
   const [isGenerating, setIsGenerating] = useState(false);
   const [briefingReady, setBriefingReady] = useState(false);
 
-  const clientName = project?.clientName.trim() || "Harper Realty";
+  const clientName = project?.clientName.trim() || "Demo Client";
   const projectType =
     project?.projectType.trim() || "Residential Real Estate";
   const location = project?.location.trim() || "Lubbock, Texas";
   const projectTitle =
-    project?.plan.projectTitle || "Harper Property Aerial Package";
+    project?.plan.projectTitle || "Demo Client — Residential Real Estate";
   const recommendedPackage =
     project?.plan.recommendedPackage || "Essential Listing Package";
 
