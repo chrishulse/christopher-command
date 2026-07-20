@@ -313,7 +313,10 @@ export default function Home() {
 
                 <button
                   type="button"
-                  onClick={() => selectTool("mission")}
+                  onClick={() => {
+                    selectTool("briefing");
+                    setBriefingOpen(true);
+                  }}
                   className="shrink-0 rounded-xl bg-white px-5 py-3 font-semibold text-slate-950 transition hover:bg-blue-100"
                 >
                   Open Mission
