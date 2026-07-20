@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-
+import ClientIntake from "./components/ClientIntake";
 type OperationsTool = "briefing" | "client" | "mission" | "marketing";
 
 const workflowSteps = [
@@ -476,7 +476,12 @@ export default function Home() {
             </article>
           </aside>
         </div>
-      </div>
+            </div>
+
+      <ClientIntake
+        open={activeTool === "client"}
+        onClose={() => selectTool("briefing")}
+      />
     </main>
   );
 }
