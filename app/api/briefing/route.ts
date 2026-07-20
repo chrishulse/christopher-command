@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import { NextResponse } from "next/server";
+import { z } from "zod";
 
 export const runtime = "nodejs";
 
@@ -9,27 +10,59 @@ const openai = new OpenAI({
   timeout: 30_000,
 });
 
-type BriefingRequest = {
-  clientName?: unknown;
-  projectType?: unknown;
-  location?: unknown;
-  deadline?: unknown;
-  notes?: unknown;
-  recommendedPackage?: unknown;
-};
+const MAX_REQUEST_BYTES = 5_000;
 
-function cleanString(
-  value: unknown,
-  fallback: string,
-  maxLength = 500,
-) {
-  if (typeof value !== "string") {
-    return fallback;
-  }
+const projectSchema = z
+  .object({
+    clientName: z.string().trim().min(1).max(100),
+    projectType: z.string().trim().min(1).max(100),
+    location: z.string().trim().min(1).max(150),
+    deadline: z.string().trim().max(50),
+    notes: z.string().trim().max(800),
+    recommendedPackage: z.string().trim().min(1).max(150),
+  })
+  .strict();
 
-  const cleaned = value.trim().slice(0, maxLength);
-  return cleaned || fallback;
-}
+const briefingOutputSchema = z
+  .object({
+    objective: z.string().trim().min(1).max(500),
+    timeline: z
+      .array(
+        z
+          .object({
+            time: z.string().trim().min(1).max(50),
+            action: z.string().trim().min(1).max(300),
+          })
+          .strict(),
+      )
+      .min(5)
+      .max(8),
+    equipment: z.array(z.string().trim().min(1).max(150)).min(5).max(10),
+    risks: z
+      .array(
+        z
+          .object({
+            title: z.string().trim().min(1).max(100),
+            detail: z.string().trim().min(1).max(300),
+          })
+          .strict(),
+      )
+      .min(3)
+      .max(5),
+    revenueOpportunity: z
+      .object({
+        amount: z.string().trim().min(1).max(100),
+        rationale: z.string().trim().min(1).max(300),
+      })
+      .strict(),
+    firstAction: z
+      .object({
+        action: z.string().trim().min(1).max(300),
+        reason: z.string().trim().min(1).max(300),
+      })
+      .strict(),
+  })
+  .strict();
 
 const briefingSchema = {
   type: "object",
@@ -37,6 +70,7 @@ const briefingSchema = {
   properties: {
     objective: {
       type: "string",
+      maxLength: 500,
     },
     timeline: {
       type: "array",
@@ -46,8 +80,8 @@ const briefingSchema = {
         type: "object",
         additionalProperties: false,
         properties: {
-          time: { type: "string" },
-          action: { type: "string" },
+          time: { type: "string", maxLength: 50 },
+          action: { type: "string", maxLength: 300 },
         },
         required: ["time", "action"],
       },
@@ -56,7 +90,7 @@ const briefingSchema = {
       type: "array",
       minItems: 5,
       maxItems: 10,
-      items: { type: "string" },
+      items: { type: "string", maxLength: 150 },
     },
     risks: {
       type: "array",
@@ -66,8 +100,8 @@ const briefingSchema = {
         type: "object",
         additionalProperties: false,
         properties: {
-          title: { type: "string" },
-          detail: { type: "string" },
+          title: { type: "string", maxLength: 100 },
+          detail: { type: "string", maxLength: 300 },
         },
         required: ["title", "detail"],
       },
@@ -76,8 +110,8 @@ const briefingSchema = {
       type: "object",
       additionalProperties: false,
       properties: {
-        amount: { type: "string" },
-        rationale: { type: "string" },
+        amount: { type: "string", maxLength: 100 },
+        rationale: { type: "string", maxLength: 300 },
       },
       required: ["amount", "rationale"],
     },
@@ -85,8 +119,8 @@ const briefingSchema = {
       type: "object",
       additionalProperties: false,
       properties: {
-        action: { type: "string" },
-        reason: { type: "string" },
+        action: { type: "string", maxLength: 300 },
+        reason: { type: "string", maxLength: 300 },
       },
       required: ["action", "reason"],
     },
@@ -109,25 +143,34 @@ export async function POST(request: Request) {
     );
   }
 
-  try {
-    const body = (await request.json()) as BriefingRequest;
+  const origin = request.headers.get("origin");
+  if (!origin || origin !== new URL(request.url).origin) {
+    return NextResponse.json({ error: "Invalid request origin." }, { status: 403 });
+  }
 
-    const project = {
-      clientName: cleanString(body.clientName, "Demo Client", 100),
-      projectType: cleanString(
-        body.projectType,
-        "Residential Real Estate",
-        100,
-      ),
-      location: cleanString(body.location, "Lubbock, Texas", 150),
-      deadline: cleanString(body.deadline, "Not specified", 50),
-      notes: cleanString(body.notes, "No additional notes.", 800),
-      recommendedPackage: cleanString(
-        body.recommendedPackage,
-        "Essential Listing Package",
-        150,
-      ),
-    };
+  const contentLength = Number(request.headers.get("content-length"));
+  if (Number.isFinite(contentLength) && contentLength > MAX_REQUEST_BYTES) {
+    return NextResponse.json({ error: "Request is too large." }, { status: 413 });
+  }
+
+  try {
+    const requestText = await request.text();
+    if (Buffer.byteLength(requestText, "utf8") > MAX_REQUEST_BYTES) {
+      return NextResponse.json({ error: "Request is too large." }, { status: 413 });
+    }
+
+    let parsedBody: unknown;
+    try {
+      parsedBody = JSON.parse(requestText);
+    } catch {
+      return NextResponse.json({ error: "Invalid JSON request." }, { status: 400 });
+    }
+    const projectResult = projectSchema.safeParse(parsedBody);
+    if (!projectResult.success) {
+      return NextResponse.json({ error: "Invalid briefing request." }, { status: 400 });
+    }
+
+    const project = projectResult.data;
 
     const response = await openai.responses.create({
       model: "gpt-5.6",
@@ -152,10 +195,20 @@ export async function POST(request: Request) {
       },
     });
 
-    const briefing = JSON.parse(response.output_text);
+    const output: unknown = JSON.parse(response.output_text);
+    const briefingResult = briefingOutputSchema.safeParse(output);
+    if (!briefingResult.success) {
+      console.error("OpenAI briefing output did not match the expected schema", {
+        requestId: response._request_id,
+      });
+      return NextResponse.json(
+        { error: "Live briefing generation failed.", fallbackAvailable: true },
+        { status: 502 },
+      );
+    }
 
     return NextResponse.json({
-      briefing,
+      briefing: briefingResult.data,
       mode: "live",
       model: "gpt-5.6",
       requestId: response._request_id,

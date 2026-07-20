@@ -116,6 +116,7 @@ The implementation:
 - Runs exclusively through `app/api/briefing/route.ts`
 - Keeps the OpenAI API key on the server
 - Uses a strict JSON schema for predictable interface output
+- Validates request data and generated JSON again at runtime before rendering
 - Limits output size
 - Disables response storage with `store: false`
 - Treats project fields as data rather than executable instructions
@@ -199,8 +200,10 @@ The current implementation includes:
 - No API key exposure in client code
 - Restricted request fields
 - Input trimming and length limits
-- Strict structured output validation
+- Same-origin request checks and a small request-body limit
+- Strict JSON Schema and runtime structured-output validation
 - API timeout and retry limits
+- Browser request cancellation and timeout handling
 - Local fallback behavior
 - Clear live-versus-fallback status labels
 - Production build and TypeScript validation
@@ -228,6 +231,14 @@ OPENAI_API_KEY=your_openai_api_key
 ```
 
 Never commit `.env.local` or expose the key in client-side code.
+
+### Deploy to Vercel
+
+Set `OPENAI_API_KEY` in the Vercel project environment for each deployed
+environment, then deploy normally. The briefing route returns `503` and the
+browser uses its local fallback when the key is absent or live generation is
+unavailable. Configure rate limiting or WAF controls at the deployment edge
+before opening the unauthenticated demo to broad public traffic.
 
 Start the development server:
 
@@ -284,6 +295,8 @@ This Build Week release is an intentionally focused MVP.
 - CT does not yet retrieve live weather, FAA airspace, traffic, email, or calendar data.
 - The current workspace is single-user.
 - Billing and subscription enforcement are not implemented.
+- The unauthenticated demo has no application-level rate limiter; production
+  traffic controls should be configured at the hosting edge.
 - Local fallback content is intentionally more general than the live GPT-5.6 result.
 
 These limitations are visible product boundaries, not hidden claims.

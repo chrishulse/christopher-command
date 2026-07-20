@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useRef, useState } from "react";
 
 type ClientIntakeProps = {
   open: boolean;
@@ -134,6 +134,7 @@ export default function ClientIntake({
   const [form, setForm] = useState<FormState>(initialForm);
   const [plan, setPlan] = useState<DemoPlan | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const generationTimeoutRef = useRef<number | null>(null);
 
   if (!open) {
     return null;
@@ -154,7 +155,7 @@ export default function ClientIntake({
     setPlan(null);
     setIsGenerating(true);
 
-    window.setTimeout(() => {
+    generationTimeoutRef.current = window.setTimeout(() => {
       const generatedPlan = createDemoPlan(form);
 
       setPlan(generatedPlan);
@@ -163,7 +164,17 @@ export default function ClientIntake({
         plan: generatedPlan,
       });
       setIsGenerating(false);
+      generationTimeoutRef.current = null;
     }, 900);
+  }
+
+  function closeIntake() {
+    if (generationTimeoutRef.current !== null) {
+      window.clearTimeout(generationTimeoutRef.current);
+      generationTimeoutRef.current = null;
+    }
+    setIsGenerating(false);
+    onClose();
   }
 
   function resetWorkspace() {
@@ -173,13 +184,18 @@ export default function ClientIntake({
   }
 
   const formComplete =
-    form.clientName &&
-    form.projectType &&
-    form.location &&
-    form.deadline;
+    form.clientName.trim() &&
+    form.projectType.trim() &&
+    form.location.trim() &&
+    form.deadline.trim();
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/95 px-4 py-6 backdrop-blur-sm sm:px-6">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="client-intake-title"
+      className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/95 px-4 py-6 backdrop-blur-sm sm:px-6"
+    >
       <div className="mx-auto max-w-7xl">
         <header className="mb-6 flex flex-col justify-between gap-4 rounded-2xl border border-slate-800 bg-slate-900/80 p-5 sm:flex-row sm:items-center">
           <div>
@@ -187,7 +203,7 @@ export default function ClientIntake({
               CLIENT OPERATIONS
             </p>
 
-            <h1 className="mt-2 text-3xl font-bold">
+            <h1 id="client-intake-title" className="mt-2 text-3xl font-bold">
               New Client Intake
             </h1>
 
@@ -203,7 +219,7 @@ export default function ClientIntake({
 
             <button
               type="button"
-              onClick={onClose}
+              onClick={closeIntake}
               className="rounded-xl border border-slate-700 px-4 py-2 text-sm text-slate-300 transition hover:border-slate-500 hover:text-white"
             >
               Return to Mission Control
@@ -231,6 +247,8 @@ export default function ClientIntake({
 
                 <input
                   required
+                  maxLength={100}
+                  autoComplete="name"
                   value={form.clientName}
                   onChange={(event) =>
                     updateField("clientName", event.target.value)
@@ -279,6 +297,8 @@ export default function ClientIntake({
 
                 <input
                   required
+                  maxLength={150}
+                  autoComplete="street-address"
                   value={form.location}
                   onChange={(event) =>
                     updateField("location", event.target.value)
@@ -311,6 +331,7 @@ export default function ClientIntake({
 
                 <textarea
                   value={form.notes}
+                  maxLength={800}
                   onChange={(event) =>
                     updateField("notes", event.target.value)
                   }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { GeneratedProject } from "./ClientIntake";
 
 type OperationsBriefingProps = {
@@ -55,6 +55,8 @@ export default function OperationsBriefing({
     useState<GenerationMode>("idle");
   const [generationMessage, setGenerationMessage] =
     useState<string | null>(null);
+  const requestControllerRef = useRef<AbortController | null>(null);
+  const requestIdRef = useRef(0);
 
   const clientName = project?.clientName.trim() || "Demo Client";
   const projectType =
@@ -169,6 +171,13 @@ export default function OperationsBriefing({
   }
 
   async function generateBriefing() {
+    const requestId = requestIdRef.current + 1;
+    requestIdRef.current = requestId;
+    const controller = new AbortController();
+    requestControllerRef.current?.abort();
+    requestControllerRef.current = controller;
+    const timeout = window.setTimeout(() => controller.abort(), 35_000);
+
     setBriefingReady(false);
     setBriefing(null);
     setGenerationMode("idle");
@@ -181,6 +190,7 @@ export default function OperationsBriefing({
         headers: {
           "Content-Type": "application/json",
         },
+        signal: controller.signal,
         body: JSON.stringify({
           clientName,
           projectType,
@@ -197,6 +207,10 @@ export default function OperationsBriefing({
 
       const result = (await response.json()) as BriefingResponse;
 
+      if (requestId !== requestIdRef.current) {
+        return;
+      }
+
       setBriefing(result.briefing);
       setGenerationMode("live");
       setGenerationMessage(
@@ -205,18 +219,28 @@ export default function OperationsBriefing({
     } catch (error) {
       console.error("Live briefing generation failed.", error);
 
+      if (requestId !== requestIdRef.current) {
+        return;
+      }
+
       setBriefing(localFallback);
       setGenerationMode("fallback");
       setGenerationMessage(
         "Live AI was unavailable, so CT continued with its local operations engine.",
       );
     } finally {
-      setIsGenerating(false);
-      setBriefingReady(true);
+      window.clearTimeout(timeout);
+      if (requestId === requestIdRef.current) {
+        setIsGenerating(false);
+        setBriefingReady(true);
+      }
     }
   }
 
   function closeBriefing() {
+    requestIdRef.current += 1;
+    requestControllerRef.current?.abort();
+    requestControllerRef.current = null;
     setIsGenerating(false);
     setBriefingReady(false);
     setBriefing(null);
@@ -226,7 +250,12 @@ export default function OperationsBriefing({
   }
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/95 px-4 py-6 text-white backdrop-blur-sm sm:px-6">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="operations-briefing-title"
+      className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/95 px-4 py-6 text-white backdrop-blur-sm sm:px-6"
+    >
       <div className="mx-auto max-w-6xl">
         <header className="mb-6 flex flex-col justify-between gap-4 rounded-2xl border border-slate-800 bg-slate-900/80 p-5 sm:flex-row sm:items-center">
           <div>
@@ -234,7 +263,7 @@ export default function OperationsBriefing({
               DAILY COMMAND
             </p>
 
-            <h1 className="mt-2 text-3xl font-bold">
+            <h1 id="operations-briefing-title" className="mt-2 text-3xl font-bold">
               Operations Briefing
             </h1>
 
@@ -300,7 +329,8 @@ export default function OperationsBriefing({
             <button
               type="button"
               onClick={generateBriefing}
-              className="mt-8 w-full rounded-xl bg-emerald-500 px-6 py-4 text-lg font-semibold shadow-lg shadow-emerald-500/20 transition hover:-translate-y-0.5 hover:bg-emerald-400 sm:w-auto"
+              disabled={isGenerating}
+              className="mt-8 w-full rounded-xl bg-emerald-500 px-6 py-4 text-lg font-semibold shadow-lg shadow-emerald-500/20 transition hover:-translate-y-0.5 hover:bg-emerald-400 disabled:cursor-not-allowed disabled:bg-slate-700 sm:w-auto"
             >
               Generate Live Briefing
             </button>
@@ -316,7 +346,7 @@ export default function OperationsBriefing({
                 GPT-5.6 is organizing the mission
               </h2>
 
-              <p className="mt-3 text-slate-400">
+              <p className="mt-3 text-slate-400" role="status" aria-live="polite">
                 Analyzing timing, requirements, risks, and next actions.
               </p>
             </div>
@@ -467,6 +497,7 @@ export default function OperationsBriefing({
               <button
                 type="button"
                 onClick={generateBriefing}
+                disabled={isGenerating}
                 className="rounded-xl border border-slate-700 px-5 py-3 font-semibold text-slate-300 transition hover:border-slate-500 hover:text-white"
               >
                 Regenerate Briefing
