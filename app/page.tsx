@@ -478,9 +478,17 @@ export default function Home() {
                         type="button"
                         onClick={() => selectTool(tool)}
                         className={`rounded-xl border px-3 py-3 text-left text-xs font-medium transition ${
-                          activeTool === tool
-                            ? "border-blue-400/40 bg-blue-500/15 text-blue-200"
-                            : "border-slate-800 bg-slate-950/50 text-slate-400 hover:border-slate-700 hover:text-white"
+                          tool === "briefing"
+                            ? activeTool === tool
+                              ? "border-emerald-300/60 bg-emerald-400/20 text-emerald-100 shadow-lg shadow-emerald-500/10"
+                              : "border-emerald-400/30 bg-emerald-400/10 text-emerald-300 hover:border-emerald-300/60 hover:bg-emerald-400/15"
+                            : tool === "client"
+                              ? activeTool === tool
+                                ? "border-amber-300/60 bg-amber-400/20 text-amber-100 shadow-lg shadow-amber-500/10"
+                                : "border-amber-400/30 bg-amber-400/10 text-amber-300 hover:border-amber-300/60 hover:bg-amber-400/15"
+                              : activeTool === tool
+                                ? "border-blue-400/40 bg-blue-500/15 text-blue-200"
+                                : "border-slate-800 bg-slate-950/50 text-slate-400 hover:border-slate-700 hover:text-white"
                         }`}
                       >
                         {operationsTools[tool].title}
