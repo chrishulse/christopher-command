@@ -1,7 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import ClientIntake from "./components/ClientIntake";
+import ClientIntake, {
+  type GeneratedProject,
+} from "./components/ClientIntake";
+import OperationsBriefing from "./components/OperationsBriefing";
 type OperationsTool = "briefing" | "client" | "mission" | "marketing";
 
 const workflowSteps = [
@@ -115,12 +118,25 @@ export default function Home() {
   const [activeTool, setActiveTool] =
     useState<OperationsTool>("briefing");
   const [actionComplete, setActionComplete] = useState(false);
+  const [briefingOpen, setBriefingOpen] = useState(false);
+  const [activeProject, setActiveProject] =
+    useState<GeneratedProject | null>(null);
 
   const selectedTool = operationsTools[activeTool];
 
   function selectTool(tool: OperationsTool) {
     setActiveTool(tool);
     setActionComplete(false);
+  }
+
+  function runSelectedTool() {
+    if (activeTool === "briefing") {
+      setBriefingOpen(true);
+      setActionComplete(false);
+      return;
+    }
+
+    setActionComplete(true);
   }
 
   if (!dashboardOpen) {
@@ -285,13 +301,13 @@ export default function Home() {
               <div className="mt-4 flex flex-col justify-between gap-6 sm:flex-row sm:items-end">
                 <div>
                   <h2 className="text-3xl font-bold">
-                    Harper Property Aerial Package
+                    {activeProject?.plan.projectTitle ??
+                      "Harper Property Aerial Package"}
                   </h2>
 
                   <p className="mt-3 max-w-2xl leading-7 text-slate-300">
-                    Capture the essential listing images, complete one
-                    smooth property orbit, and prepare same-day preview
-                    assets.
+                    {activeProject?.plan.executiveSummary ??
+                      "Capture the essential listing images, complete one smooth property orbit, and prepare same-day preview assets."}
                   </p>
                 </div>
 
@@ -429,7 +445,7 @@ export default function Home() {
 
               <button
                 type="button"
-                onClick={() => setActionComplete(true)}
+                onClick={runSelectedTool}
                 className="mt-6 w-full rounded-xl bg-blue-500 px-5 py-3 font-semibold transition hover:bg-blue-400"
               >
                 {actionComplete
@@ -478,9 +494,16 @@ export default function Home() {
         </div>
             </div>
 
+      <OperationsBriefing
+        open={briefingOpen}
+        project={activeProject}
+        onClose={() => setBriefingOpen(false)}
+      />
+
       <ClientIntake
         open={activeTool === "client"}
         onClose={() => selectTool("briefing")}
+        onProjectGenerated={setActiveProject}
       />
     </main>
   );

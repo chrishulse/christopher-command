@@ -5,9 +5,10 @@ import { FormEvent, useState } from "react";
 type ClientIntakeProps = {
   open: boolean;
   onClose: () => void;
+  onProjectGenerated: (project: GeneratedProject) => void;
 };
 
-type FormState = {
+export type FormState = {
   clientName: string;
   projectType: string;
   location: string;
@@ -15,7 +16,7 @@ type FormState = {
   notes: string;
 };
 
-type DemoPlan = {
+export type DemoPlan = {
   projectTitle: string;
   executiveSummary: string;
   recommendedPackage: string;
@@ -24,6 +25,10 @@ type DemoPlan = {
   checklist: string[];
   deliveryPlan: string[];
   followUpTasks: string[];
+};
+
+export type GeneratedProject = FormState & {
+  plan: DemoPlan;
 };
 
 const initialForm: FormState = {
@@ -124,6 +129,7 @@ function PlanSection({
 export default function ClientIntake({
   open,
   onClose,
+  onProjectGenerated,
 }: ClientIntakeProps) {
   const [form, setForm] = useState<FormState>(initialForm);
   const [plan, setPlan] = useState<DemoPlan | null>(null);
@@ -149,7 +155,13 @@ export default function ClientIntake({
     setIsGenerating(true);
 
     window.setTimeout(() => {
-      setPlan(createDemoPlan(form));
+      const generatedPlan = createDemoPlan(form);
+
+      setPlan(generatedPlan);
+      onProjectGenerated({
+        ...form,
+        plan: generatedPlan,
+      });
       setIsGenerating(false);
     }, 900);
   }
